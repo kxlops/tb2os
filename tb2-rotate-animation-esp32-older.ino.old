@@ -1,0 +1,63 @@
+#include <Wire.h>
+#include "SSD1306Wire.h"
+#include "pins_arduino.h"
+#include "frame_data.h" // Include the frame data
+
+// Initialize the OLED display using Arduino Wire:
+SSD1306Wire display(0x3c, SDA_OLED, SCL_OLED);  // ADDRESS, SDA, SCL
+
+#define FRAME_DELAY 100  // Delay between frames in milliseconds
+
+const int numFrames = sizeof(frames) / sizeof(frames[0]);
+
+void setup() {
+  Serial.begin(115200);
+  while (!Serial) {
+    delay(100);
+  }
+  Serial.println();
+  Serial.println();
+
+  // This turns on and resets the OLED on the Heltec boards
+  VextON();
+  displayReset();
+
+  // Initialising the UI will init the display too.
+  display.init();
+
+  display.flipScreenVertically();
+  display.setFont(ArialMT_Plain_10);
+}
+
+void displayFrame(const unsigned char* frame) {
+  display.clear();
+  display.drawXbm(0, 0, 128, 64, frame);
+  display.display();
+}
+
+void loop() {
+  for (int i = 0; i < numFrames; i++) {
+    displayFrame(frames[i]);
+    delay(FRAME_DELAY);
+  }
+}
+
+void VextON(void) {
+  pinMode(Vext, OUTPUT);
+  digitalWrite(Vext, LOW);
+}
+
+void VextOFF(void) {
+  pinMode(Vext, OUTPUT);
+  digitalWrite(Vext, HIGH);
+}
+
+void displayReset(void) {
+  pinMode(RST_OLED, OUTPUT);
+  digitalWrite(RST_OLED, HIGH);
+  delay(1);
+  digitalWrite(RST_OLED, LOW);
+  delay(1);
+  digitalWrite(RST_OLED, HIGH);
+  delay(1);
+}
