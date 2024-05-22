@@ -1,89 +1,120 @@
 import sys
+import os
+from PIL import Image, ImageOps, ImageSequence
 import argparse
-from PIL import Image, ImageSequence, ImageOps
 
-def gif_to_monochrome_array(gif_path, width=128, height=64, invert=False):
-    # Open the GIF file
-    gif = Image.open(gif_path)
-    
-    # Create an array to store the pixel data for each frame
+def gif_to_frames(gif_path, width=128, height=64, invert=False):
     frames = []
-    preview_frames = []  # For creating the preview GIF
-    
-    # Iterate through each frame in the GIF
-    for frame in ImageSequence.Iterator(gif):
-        # Resize the frame to fit the OLED display dimensions with high quality
-        resized_frame = frame.resize((width, height), Image.BICUBIC)
-        
-        # Convert the resized frame to grayscale
-        grayscale_frame = resized_frame.convert('L')
-        
-        # Optionally invert the frame
-        if invert:
-            grayscale_frame = ImageOps.invert(grayscale_frame)
-        
-        # Convert to monochrome (black and white)
-        monochrome_frame = grayscale_frame.point(lambda x: 0 if x < 128 else 255, '1')
-        
-        # Get the pixel data
-        pixels = list(monochrome_frame.getdata())
-        
-        # Convert the 2D array to a 1D array of bytes
-        byte_array = []
-        for y in range(height):
-            for x in range(0, width, 8):
-                byte = 0
-                for bit in range(8):
-                    if x + bit < width and pixels[y * width + x + bit] == 0:
-                        byte |= (1 << (7 - bit))
-                byte_array.append(byte)
-        
-        # Append the byte array to the list of frames
-        frames.append(byte_array)
-        preview_frames.append(monochrome_frame)
-    
-    # Save the preview GIF
-    preview_gif_path = gif_path.replace(".gif", "-preview.gif")
-    preview_frames[0].save(preview_gif_path, save_all=True, append_images=preview_frames[1:], loop=0, duration=gif.info['duration'])
-    
-    return frames, preview_gif_path
+    with Image.open(gif_path) as img:
+        for frame in ImageSequence.Iterator(img):
+            frame = frame.convert("1")  # Convert to 1-bit pixels (monochrome)
+            frame = scale_and_crop(frame, width, height)
+            if invert:
+                frame = ImageOps.invert(frame.convert("L")).convert("1")
+            frames.append(frame)
+    return frames
 
-def write_frame_as_c_array(frame, frame_number, file):
-    file.write(f"const unsigned char frame{frame_number}[] PROGMEM = {{\n")
-    for i in range(0, len(frame), 16):  # Print 16 bytes per line
-        file.write("    " + ", ".join(f"0x{byte:02X}" for byte in frame[i:i+16]) + ",\n")
-    file.write("};\n")
+def scale_and_crop(image, target_width, target_height):
+    # Calculate the target aspect ratio
+    target_ratio = target_width / target_height
+    image_ratio = image.width / image.height
+
+    # Determine which dimension to base the scaling on
+    if image_ratio > target_ratio:
+        # Wider than the target aspect ratio
+        new_height = target_height
+        new_width = int(target_height * image_ratio)
+    else:
+        # Taller than the target aspect ratio
+        new_width = target_width
+        new_height = int(target_width / image_ratio)
+
+    # Resize the image while maintaining the aspect ratio
+    image = image.resize((new_width, new_height), Image.LANCZOS)
+    
+    # Calculate the cropping box
+    left = (new_width - target_width) // 2
+    top = (new_height - target_height) // 2
+    right = left + target_width
+    bottom = top + target_height
+
+    # Crop the image to the target size
+    image = image.crop((left, top, right, bottom))
+
+    return image
+
+def create_gif(frames, output_path, duration=100):
+    frames[0].save(output_path, save_all=True, append_images=frames[1:], duration=duration, loop=0)
+
+def frame_to_bitmap(frame):
+    frame = frame.convert('1')
+    pixels = list(frame.getdata())
+    width, height = frame.size
+    bitmap = []
+
+    for y in range(height):
+        byte = 0
+        for x in range(width):
+            if pixels[y * width + x] == 0:  # 0 is black, 255 is white
+                byte |= (1 << (7 - (x % 8)))
+            if x % 8 == 7:
+                bitmap.append(reverse_byte(byte))
+                byte = 0
+        if width % 8 != 0:
+            bitmap.append(reverse_byte(byte))
+
+    return bitmap
+
+def frames_to_bitmaps(frames):
+    bitmaps = []
+    for frame in frames:
+        bitmaps.append(frame_to_bitmap(frame))
+    return bitmaps
+
+def save_bitmaps_to_header(bitmaps, file_path):
+    with open(file_path, 'w') as f:
+        f.write('#ifndef FRAME_DATA_H\n#define FRAME_DATA_H\n\n')
+
+        for i, bitmap in enumerate(bitmaps):
+            f.write(f'const uint8_t frame_{i}[] PROGMEM = {{\n')
+            for j in range(0, len(bitmap), 16):
+                line = ', '.join(f'0x{byte:02X}' for byte in bitmap[j:j+16])
+                f.write(f'    {line},\n')
+            f.write('};\n\n')
+
+        f.write('const uint8_t* frames[] PROGMEM = {\n')
+        for i in range(len(bitmaps)):
+            f.write(f'    frame_{i},\n')
+        f.write('};\n\n')
+
+        f.write('#endif\n')
+
+def reverse_byte(byte):
+    reversed_byte = 0
+    for i in range(8):
+        reversed_byte = (reversed_byte << 1) | (byte & 1)
+        byte >>= 1
+    return reversed_byte
 
 def main():
-    parser = argparse.ArgumentParser(description='Convert GIF to monochrome C arrays for Arduino.')
-    parser.add_argument('gif_path', type=str, help='Path to the GIF file.')
-    parser.add_argument('--invert', action='store_true', help='Invert the pixels in the GIF.')
-    args = parser.parse_args()
-
-    gif_path = args.gif_path
-    invert = args.invert
-
-    frames, preview_gif_path = gif_to_monochrome_array(gif_path, invert=invert)
-    header_file_path = "frame_data.h"
-
-    with open(header_file_path, 'w') as file:
-        file.write("#ifndef FRAME_DATA_H\n")
-        file.write("#define FRAME_DATA_H\n\n")
-        
-        for i, frame in enumerate(frames):
-            file.write(f"// Frame {i + 1}\n")
-            write_frame_as_c_array(frame, i + 1, file)
-            file.write("\n")
-        
-        file.write("const unsigned char* frames[] PROGMEM = {\n")
-        for i in range(len(frames)):
-            file.write(f"  frame{i + 1},\n")
-        file.write("};\n\n")
-        
-        file.write("#endif // FRAME_DATA_H\n")
+    parser = argparse.ArgumentParser(description="Convert an animated GIF to a series of frames for use with an ESP32 display.")
+    parser.add_argument("gif_path", help="Path to the GIF file")
+    parser.add_argument("--invert", action="store_true", help="Invert the image colors")
     
-    print(f"Header file saved as: {header_file_path}")
-    print(f"Preview GIF saved as: {preview_gif_path}")
+    args = parser.parse_args()
+    
+    gif_path = args.gif_path
+    gif_name = os.path.splitext(os.path.basename(gif_path))[0]
+    output_gif = f'preview_{gif_name}.gif'
+    header_file = 'frame_data.h'
+
+    frames = gif_to_frames(gif_path, invert=args.invert)
+    bitmaps = frames_to_bitmaps(frames)
+    save_bitmaps_to_header(bitmaps, header_file)
+    create_gif(frames, output_gif)
+
+    print(f"Bitmap header file saved to {header_file}")
+    print(f"Preview GIF created and saved to {output_gif}")
 
 if __name__ == "__main__":
     main()
