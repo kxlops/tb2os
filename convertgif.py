@@ -105,7 +105,7 @@ def main():
     
     gif_path = args.gif_path
     gif_name = os.path.splitext(os.path.basename(gif_path))[0]
-    output_gif = f'preview_{gif_name}.gif'
+    output_gif = f'{gif_name}-preview.gif'
     header_file = 'frame_data.h'
 
     frames = gif_to_frames(gif_path, invert=args.invert)
