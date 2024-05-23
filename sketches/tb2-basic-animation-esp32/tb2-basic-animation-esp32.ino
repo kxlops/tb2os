@@ -1,10 +1,10 @@
 #include <Wire.h>
-#include "SSD1306Wire.h"
+#include "HT_SSD1306Wire.h"
 #include "pins_arduino.h"
 #include "frame_data.h" // Include the frame data
 
 // Initialize the OLED display using Arduino Wire:
-SSD1306Wire display(0x3c, SDA_OLED, SCL_OLED);  // ADDRESS, SDA, SCL
+SSD1306Wire  display(0x3c, 500000, SDA_OLED, SCL_OLED, GEOMETRY_128_64, RST_OLED); // addr , freq , i2c group , resolution , rst
 
 const int numFrames = sizeof(frames) / sizeof(frames[0]);
 const int frameDelay = 50;  // Fixed delay between frames in milliseconds
@@ -15,7 +15,7 @@ int gridDepth = 2;     // Default depth factor for grid lines
 int verticalRange = 4; // Default range for vertical lines
 int horizontalRange = 2; // Default range for horizontal lines
 bool debugLogs = false; // Default debug logging setting
-bool dottedLines = false; // Default line type setting (false for solid, true for dotted)
+bool dottedLines = true; // Default line type setting (false for solid, true for dotted)
 int dottedLineGap = 4; // Default gap for dotted lines
 
 void VextON(void) {

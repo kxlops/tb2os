@@ -100,13 +100,14 @@ def main():
     parser = argparse.ArgumentParser(description="Convert an animated GIF to a series of frames for use with an ESP32 display.")
     parser.add_argument("gif_path", help="Path to the GIF file")
     parser.add_argument("--invert", action="store_true", help="Invert the image colors")
+    parser.add_argument("--output-dir", help="Output directory for the frame_data.h file", default=".")
     
     args = parser.parse_args()
     
     gif_path = args.gif_path
     gif_name = os.path.splitext(os.path.basename(gif_path))[0]
     output_gif = f'{gif_name}-preview.gif'
-    header_file = 'frame_data.h'
+    header_file = os.path.join(args.output_dir, 'frame_data.h')
 
     frames = gif_to_frames(gif_path, invert=args.invert)
     bitmaps = frames_to_bitmaps(frames)
