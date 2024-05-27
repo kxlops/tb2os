@@ -1,4 +1,5 @@
 #include <TaskScheduler.h>
+#include "pins_arduino.h"  // Include the pin definitions
 
 // Create a scheduler object
 Scheduler runner;
@@ -15,10 +16,22 @@ Task task2(2000, TASK_FOREVER, &task2Callback);
 enum State {IDLE, RUNNING, FINISHED};
 State currentState = IDLE;
 
+// Motor control pins for L9110S
+const uint8_t motor1A = T4;  // IN1 for motor 1
+const uint8_t motor1B = T5;  // IN2 for motor 1
+const uint8_t motor2A = T6;  // IN1 for motor 2
+const uint8_t motor2B = T7;  // IN2 for motor 2
+
 void setup() {
   // Initialize serial communication
   Serial.begin(115200);
   Serial.println("Starting tb2os...");
+
+  // Initialize motor control pins
+  pinMode(motor1A, OUTPUT);
+  pinMode(motor1B, OUTPUT);
+  pinMode(motor2A, OUTPUT);
+  pinMode(motor2B, OUTPUT);
 
   // Add tasks to the scheduler
   runner.addTask(task1);
@@ -65,9 +78,15 @@ void loop() {
 // Task 1 callback function
 void task1Callback() {
   Serial.println("Task 1 executed");
+  // Example motor control: rotate motor 1 forward
+  digitalWrite(motor1A, HIGH);
+  digitalWrite(motor1B, LOW);
 }
 
 // Task 2 callback function
 void task2Callback() {
   Serial.println("Task 2 executed");
+  // Example motor control: rotate motor 2 backward
+  digitalWrite(motor2A, LOW);
+  digitalWrite(motor2B, HIGH);
 }
