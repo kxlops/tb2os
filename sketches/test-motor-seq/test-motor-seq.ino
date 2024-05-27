@@ -63,13 +63,14 @@ struct MotorSequenceStep {
 
 // Define motor sequences
 MotorSequenceStep sequence1[] = {
-  { true, 80, 100, NONE },   // Ease in forward at medium speed for 2 seconds
-  { true, 80, 10000, EASE_IN },   // Ease in forward at medium speed for 2 seconds
-  { true, 80, 10000, NONE },      // Forward at medium speed for 2 seconds
-  { true, 80, 30000, EASE_OUT },  // Ease out forward to stop in 1 second
-  // {false, 128, 2000, EASE_IN}, // Ease in reverse at medium speed for 2 seconds
-  // {false, 128, 2000, NONE},    // Reverse at medium speed for 2 seconds
-  // {false, 0, 1000, EASE_OUT}   // Ease out reverse to stop in 1 second
+  {false, 100, 1000, NONE},
+  {true, 100, 1000, NONE},
+  { true, 100, 10000, EASE_IN },    // Ease in forward at medium speed for 10 seconds
+  { true, 100, 10000, NONE },       // Forward at medium speed for 10 seconds
+  { true, 100, 30000, EASE_OUT },   // Ease out forward to stop in 30 seconds
+  // {false, 128, 2000, EASE_IN},   // Ease in reverse at medium speed for 2 seconds
+  // {false, 128, 2000, NONE},      // Reverse at medium speed for 2 seconds
+  // {false, 0, 1000, EASE_OUT}     // Ease out reverse to stop in 1 second
 };
 
 // Sequence state variables
