@@ -12,3 +12,9 @@ Thumbs.db
 # ignore comparison files
 test*-compare
 test*-compare.ino
+
+# ignore gif previews
+*-preview.gif
+
+
+
