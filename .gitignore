@@ -8,3 +8,7 @@ Thumbs.db
 
 # Ignore library dependencies folder
 /sketches/libraries/*/
+
+# ignore comparison files
+test*-compare
+test*-compare.ino
