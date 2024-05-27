@@ -1,0 +1,10 @@
+# Ignore OS-specific files
+.DS_Store
+Thumbs.db
+
+# Ignore sketchbook backup files
+*.bak
+*.swp
+
+# Ignore library dependencies folder
+/sketches/libraries/*/
