@@ -65,9 +65,9 @@ struct MotorSequenceStep {
 MotorSequenceStep sequence1[] = {
   {false, 100, 1000, NONE},
   {true, 100, 1000, NONE},
-  { true, 100, 10000, EASE_IN },    // Ease in forward at medium speed for 10 seconds
-  { true, 100, 10000, NONE },       // Forward at medium speed for 10 seconds
-  { true, 100, 30000, EASE_OUT },   // Ease out forward to stop in 30 seconds
+  {true, 100, 10000, EASE_IN},    // Ease in forward at medium speed for 10 seconds
+  {true, 100, 10000, NONE},       // Forward at medium speed for 10 seconds
+  {true, 100, 30000, EASE_OUT},   // Ease out forward to stop in 30 seconds
   // {false, 128, 2000, EASE_IN},   // Ease in reverse at medium speed for 2 seconds
   // {false, 128, 2000, NONE},      // Reverse at medium speed for 2 seconds
   // {false, 0, 1000, EASE_OUT}     // Ease out reverse to stop in 1 second
@@ -99,6 +99,10 @@ unsigned long lastDebounceTime1 = 0;
 unsigned long lastDebounceTime2 = 0;
 unsigned long lastDebounceTime3 = 0;
 const unsigned long debounceDelay = 50;
+
+// Track last values to print only when changes occur
+bool lastDirection = !currentDirection;
+int lastSpeed = -1;
 
 void setup() {
   // Initialize serial communication for debugging
@@ -191,13 +195,13 @@ void setMotorSpeed(int speed) {
 
 void stopMotor() {
   setMotorSpeed(0);
-  delay(100);                         // Small delay to ensure the motor stops completely
   digitalWrite(MOTOR1_IN1_PIN, LOW);  // Ensure both IN1 and IN2 are LOW to stop the motor
   digitalWrite(MOTOR1_IN2_PIN, LOW);
   digitalWrite(MOTOR2_IN1_PIN, LOW);  // Ensure both IN1 and IN2 are LOW to stop the motor
   digitalWrite(MOTOR2_IN2_PIN, LOW);
   Serial.println("Motor stopped");
   currentSpeed = 0;
+  lastSpeed = -1;
 }
 
 void easeMotorSpeed(unsigned long startTime, unsigned long duration, int startSpeed, int endSpeed) {
@@ -211,7 +215,6 @@ void easeMotorSpeed(unsigned long startTime, unsigned long duration, int startSp
     Serial.println(value);
   } else {
     setMotorSpeed(endSpeed);
-    motorState = OFF;
   }
 }
 
@@ -306,8 +309,7 @@ void runMotorSequence() {
       Serial.print(", Duration ");
       Serial.print(step.duration);
       Serial.print(", Easing ");
-      Serial.println(step.easing == EASE_IN ? "EASE_IN" : step.easing == EASE_OUT ? "EASE_OUT"
-                                                                                  : "NONE");
+      Serial.println(step.easing == EASE_IN ? "EASE_IN" : step.easing == EASE_OUT ? "EASE_OUT" : "NONE");
 
       if (step.easing == EASE_IN) {
         motorState = EASING_IN;
@@ -335,6 +337,7 @@ void runMotorSequence() {
 
 void stopMotorSequence() {
   stopMotor();
+  motorState = OFF;  // Ensure the motor state is updated
   taskRunMotorSequence.disable();
 }
 
@@ -345,18 +348,26 @@ void updateDisplay() {
   String direction = sequenceRunning ? (currentSequence[currentStep].direction ? "Fwd" : "Rev") : "N/A";
   int speed = sequenceRunning ? currentSequence[currentStep].speed : 0;
   unsigned long duration = sequenceRunning ? currentSequence[currentStep].duration : 0;
-  String easing = sequenceRunning ? (currentSequence[currentStep].easing == EASE_IN ? "In" : currentSequence[currentStep].easing == EASE_OUT ? "Out"
-                                                                                                                                             : "None")
-                                  : "None";
+  String easing = sequenceRunning ? (currentSequence[currentStep].easing == EASE_IN ? "In" : currentSequence[currentStep].easing == EASE_OUT ? "Out" : "None") : "None";
+  
+  String stateString;
+  switch (motorState) {
+    case OFF: stateString = "OFF"; break;
+    case FORWARD: stateString = "FORWARD"; break;
+    case BACKWARD: stateString = "BACKWARD"; break;
+    case STOPPING: stateString = "STOPPING"; break;
+    case EASING_IN: stateString = "EASING_IN"; break;
+    case EASING_OUT: stateString = "EASING_OUT"; break;
+  }
 
   display.clear();
   display.setFont(ArialMT_Plain_10);
-  display.drawString(0, 0, currentSequenceName + " | Step: " + currentStep);
-  display.drawString(0, 10, "Spd: " + String(speed) + " Dir: " + direction);
-  display.drawString(0, 20, "Dur: " + String(duration) + "ms Ease: " + easing);
-  display.drawString(0, 30, "M1 PWM: " + String(motor1PWMValue) + " Dir: " + (currentDirection ? "Fwd" : "Rev"));
-  display.drawString(0, 40, "M2 PWM: " + String(motor2PWMValue) + " Dir: " + (currentDirection ? "Fwd" : "Rev"));
-  display.drawString(0, 50, "Time Left: " + String(timeRemaining) + "ms");
+  display.drawString(0, 0, "Stp: " + String(currentStep) + " Sp: " + String(speed) + " Dr: " + direction + " E: " + easing);
+  display.drawString(0, 10, "Dur: " + String(duration));
+  display.drawString(0, 20, "M1 PWM: " + String(motor1PWMValue) + " Dir: " + (currentDirection ? "Fwd" : "Rev"));
+  display.drawString(0, 30, "M2 PWM: " + String(motor2PWMValue) + " Dir: " + (currentDirection ? "Fwd" : "Rev"));
+  display.drawString(0, 40, "Time Left: " + String(timeRemaining) + "ms");
+  display.drawString(0, 50, "State: " + stateString);
   display.display();
 
   Serial.print("Motor 1 - Direction: ");
@@ -383,6 +394,9 @@ void updateDisplay() {
 
   Serial.print("Time Remaining: ");
   Serial.println(timeRemaining);
+
+  Serial.print("State: ");
+  Serial.println(stateString);
 }
 
 void loop() {
